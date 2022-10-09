@@ -44,7 +44,7 @@ class Transformador:
 
 @dataclass
 class FonteDeCorrenteSenoidal:
-    '''Representa um ramo com fonte de corrente DC'''
+    '''Representa um ramo com fonte de corrente senoidal'''
     identificacao: str
     no1: int
     no2: int
@@ -266,7 +266,7 @@ def adicionarCapacitor(
 def adicionarTransformador(
         matriz: MatrizCondutancia, transformador: Transformador, frequencia: float
 ) -> MatrizCondutancia:
-    '''Ela adiciona um transformador na matriz de condutância do circuito'''
+    '''Ela adiciona um transformador na matriz de admitância do circuito'''
     l1l2 = transformador.valorIndutancia1 * transformador.valorIndutancia2
     gama1 = transformador.valorIndutancia2/(l1l2 - transformador.valorIndutanciaMutua**2)
     gama12 = -transformador.valorIndutanciaMutua/(l1l2 - transformador.valorIndutanciaMutua**2)

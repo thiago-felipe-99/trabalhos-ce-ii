@@ -313,13 +313,14 @@ def adicionarFonteDeCorrenteSenoidal(
     i(t) = <amplitude> * cos ( 2*pi*<frequencia>*t + <fase>*pi/180 ) no vetor de 
     fontes do circuito'''
 
-    valor = fonte.amplitude * numpy.cos((fonte.faseGraus*numpy.pi)/180)
+    valor = fonte.amplitude * (numpy.cos((fonte.faseGraus*numpy.pi)/180) + 
+                               numpy.sin((fonte.faseGraus*numpy.pi)/180)*1j)
     vetor[fonte.no1] -= valor
     vetor[fonte.no2] += valor
 
     return vetor
 
-def main(arquivo: str):# -> numpy.ndarray:
+def main(arquivo: str) -> numpy.ndarray:
     '''Função principal onde ele ler um arquivo do formato de uma netlist, faz a 
     solução do circuito e retorna ela'''
     circuito = lerArquivo(arquivo)
@@ -345,21 +346,6 @@ def main(arquivo: str):# -> numpy.ndarray:
     for fonte in circuito.fontesDeCorrenteSenoidal:
         vetor = adicionarFonteDeCorrenteSenoidal(vetor, fonte)
 
-
-    # matriz_string = ""
-    # for linha in matriz[1:]:
-    #     linha_string = ""
-    #     for coluna in linha[1:]:
-    #        linha_string += f"{coluna:.10f}," 
-    #     matriz_string += f"{{{linha_string[:-1]}}},"
-
-    # linha_string = ""
-    # for coluna in vetor[1:]:
-    #     linha_string += f"{{{coluna:.10f}}}," 
-
-    # x = "{{x},{y},{z}}"
-    # print(f"{{{matriz_string[:-1]}}}*{x}={{{linha_string[:-1]}}}".replace("j", "i"))
-    print("Vetor de fontes independentes:", list(map('{:.3f}'.format,vetor[1:])))
     return numpy.linalg.solve(matriz[1:, 1:], vetor[1: ])
 
 if __name__ == "__main__":

@@ -13,6 +13,36 @@ class Resitor:
     valor: float
 
 @dataclass
+class Indutor:
+    '''Representa um ramo com indutor'''
+    identificacao: str
+    no1: int
+    no2: int
+    valor: float
+    condicaoInicial: float
+
+@dataclass
+class Capacitor:
+    '''Representa um ramo com capacitor'''
+    identificacao: str
+    no1: int
+    no2: int
+    valor: float
+    condicaoInicial: float
+
+@dataclass
+class Transformador:
+    '''Representa um ramo com um transformador'''
+    identificacao: str
+    no1: int
+    no2: int
+    no3: int
+    no4: int
+    valorIndutancia1: float
+    valorIndutancia2: float
+    valorIndutanciaMutua: float
+
+@dataclass
 class FonteDeCorrenteDC:
     '''Representa um ramo com fonte de corrente DC'''
     identificacao: str
@@ -21,8 +51,47 @@ class FonteDeCorrenteDC:
     valor: float
 
 @dataclass
+class FonteDeTensaoDC:
+    '''Representa um ramo com fonte de tensão DC'''
+    identificacao: str
+    no1: int
+    no2: int
+    valor: float
+
+@dataclass
 class FonteDeCorrenteDCControladaPorTensao:
     '''Representa um ramo com fonte de corrente DC controlada por tensão'''
+    identificacao: str
+    no1: int
+    no2: int
+    no3: int
+    no4: int
+    valor: float
+
+@dataclass
+class FonteDeCorrenteDCControladaPorCorrente:
+    '''Representa um ramo com fonte de corrente DC controlada por corrente'''
+    identificacao: str
+    no1: int
+    no2: int
+    no3: int
+    no4: int
+    valor: float
+
+
+@dataclass
+class FonteDeTensaoDCControladaPorTensao:
+    '''Representa um ramo com fonte de tensão DC controlada por tensão'''
+    identificacao: str
+    no1: int
+    no2: int
+    no3: int
+    no4: int
+    valor: float
+
+@dataclass
+class FonteDeTensaoDCControladaPorCorrente:
+    '''Representa um ramo com fonte de te DC controlada por corrente'''
     identificacao: str
     no1: int
     no2: int

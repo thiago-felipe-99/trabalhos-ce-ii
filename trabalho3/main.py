@@ -218,7 +218,53 @@ def pegarMaiorNo(circuito: Circuito) -> int:
         if fonte.no2 > no: 
             no = fonte.no2
 
+    for fonte in circuito.fontesDeTensaoDC:
+        if fonte.no1 > no: 
+            no = fonte.no1
+
+        if fonte.no2 > no: 
+            no = fonte.no2
+
     for fonte in circuito.fontesDeCorrenteDCControladaPorTensao:
+        if fonte.no1 > no: 
+            no = fonte.no1
+
+        if fonte.no2 > no: 
+            no = fonte.no2
+
+        if fonte.no3 > no: 
+            no = fonte.no3
+
+        if fonte.no4 > no: 
+            no = fonte.no4
+
+    for fonte in circuito.fontesDeCorrenteDCControladaPorCorrente:
+        if fonte.no1 > no: 
+            no = fonte.no1
+
+        if fonte.no2 > no: 
+            no = fonte.no2
+
+        if fonte.no3 > no: 
+            no = fonte.no3
+
+        if fonte.no4 > no: 
+            no = fonte.no4
+
+    for fonte in circuito.fontesDeTensaoDCControladaPorTensao:
+        if fonte.no1 > no: 
+            no = fonte.no1
+
+        if fonte.no2 > no: 
+            no = fonte.no2
+
+        if fonte.no3 > no: 
+            no = fonte.no3
+
+        if fonte.no4 > no: 
+            no = fonte.no4
+
+    for fonte in circuito.fontesDeTensaoDCControladaPorCorrente:
         if fonte.no1 > no: 
             no = fonte.no1
 
@@ -281,7 +327,8 @@ def main(arquivo: str) -> numpy.ndarray:
         vetor = adicionarFonteDeDCCorrente(vetor, fonte)
 
     # return numpy.linalg.solve(matriz[1:, 1:], vetor[1: ])
-    print(circuito)
+    print(maiorNo)
+    print(circuito.quantidadeDeVariaveisDeCorrente)
     return ndarray([])
 
 if __name__ == "__main__":

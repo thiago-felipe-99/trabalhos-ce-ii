@@ -29,6 +29,7 @@ class FonteDeTensaoDC:
     no1: int
     no2: int
     valor: float
+    posicaoVariavelDeCorrente: int
 
 @dataclass
 class FonteDeCorrenteDCControladaPorTensao:
@@ -49,6 +50,7 @@ class FonteDeCorrenteDCControladaPorCorrente:
     no3: int
     no4: int
     valor: float
+    posicaoVariavelDeCorrente: int
 
 
 @dataclass
@@ -60,6 +62,7 @@ class FonteDeTensaoDCControladaPorTensao:
     no3: int
     no4: int
     valor: float
+    posicaoVariavelDeCorrente: int
 
 @dataclass
 class FonteDeTensaoDCControladaPorCorrente:
@@ -70,13 +73,20 @@ class FonteDeTensaoDCControladaPorCorrente:
     no3: int
     no4: int
     valor: float
+    posicaoVariavelDeCorrente1: int
+    posicaoVariavelDeCorrente2: int
 
 @dataclass
 class Circuito:
     '''Representa quais são os componentes de um circuito elétrico'''
     resitores: list[Resitor] = field(default_factory=list)
     fontesDeCorrenteDC: list[FonteDeCorrenteDC] = field(default_factory=list)
+    fontesDeTensaoDC: list[FonteDeTensaoDC] = field(default_factory=list)
     fontesDeCorrenteDCControladaPorTensao: list[FonteDeCorrenteDCControladaPorTensao] = field(default_factory=list)
+    fontesDeCorrenteDCControladaPorCorrente: list[FonteDeCorrenteDCControladaPorCorrente] = field(default_factory=list)
+    fontesDeTensaoDCControladaPorTensao: list[FonteDeTensaoDCControladaPorTensao] = field(default_factory=list)
+    fontesDeTensaoDCControladaPorCorrente: list[FonteDeTensaoDCControladaPorCorrente] = field(default_factory=list)
+    quantidadeDeVariaveisDeCorrente: int = 0
 
 MatrizCondutancia: TypeAlias = numpy.ndarray
 VetorDeFontes: TypeAlias = numpy.ndarray
@@ -116,6 +126,55 @@ def lerArquivo(arquivo: str) -> Circuito:
                 )
             )
 
+        elif componente[0][0] == "F":
+            identificacao = componente[0][1:]
+            no1 = int(componente[1])
+            no2 = int(componente[2])
+            no3 = int(componente[3])
+            no4 = int(componente[4])
+            valor = float(componente[5])
+            posicao = circuito.quantidadeDeVariaveisDeCorrente + 1
+
+            circuito.fontesDeCorrenteDCControladaPorCorrente.append(
+                FonteDeCorrenteDCControladaPorCorrente(
+                    identificacao, no1, no2, no3, no4, valor, posicao
+                )
+            )
+            circuito.quantidadeDeVariaveisDeCorrente += 1
+
+        elif componente[0][0] == "E":
+            identificacao = componente[0][1:]
+            no1 = int(componente[1])
+            no2 = int(componente[2])
+            no3 = int(componente[3])
+            no4 = int(componente[4])
+            valor = float(componente[5])
+            posicao = circuito.quantidadeDeVariaveisDeCorrente + 1
+
+            circuito.fontesDeTensaoDCControladaPorTensao.append(
+                FonteDeTensaoDCControladaPorTensao(
+                    identificacao, no1, no2, no3, no4, valor, posicao
+                )
+            )
+            circuito.quantidadeDeVariaveisDeCorrente += 1
+
+        elif componente[0][0] == "H":
+            identificacao = componente[0][1:]
+            no1 = int(componente[1])
+            no2 = int(componente[2])
+            no3 = int(componente[3])
+            no4 = int(componente[4])
+            valor = float(componente[5])
+            posicao1 = circuito.quantidadeDeVariaveisDeCorrente + 1
+            posicao2 = posicao1 + 1
+
+            circuito.fontesDeTensaoDCControladaPorCorrente.append(
+                FonteDeTensaoDCControladaPorCorrente(
+                    identificacao, no1, no2, no3, no4, valor, posicao1, posicao2
+                )
+            )
+            circuito.quantidadeDeVariaveisDeCorrente += 2
+
         elif componente[0][0] == "I":
             identificacao = componente[0][1:]
             no1 = int(componente[1])
@@ -125,6 +184,18 @@ def lerArquivo(arquivo: str) -> Circuito:
             circuito.fontesDeCorrenteDC.append(
                 FonteDeCorrenteDC(identificacao, no1, no2, valor)
             )
+
+        elif componente[0][0] == "V":
+            identificacao = componente[0][1:]
+            no1 = int(componente[1])
+            no2 = int(componente[2])
+            valor = float(componente[4])
+            posicao = circuito.quantidadeDeVariaveisDeCorrente + 1
+
+            circuito.fontesDeTensaoDC.append(
+                FonteDeTensaoDC(identificacao, no1, no2, valor, posicao)
+            )
+            circuito.quantidadeDeVariaveisDeCorrente += 1
 
     return circuito
 
@@ -209,7 +280,9 @@ def main(arquivo: str) -> numpy.ndarray:
     for fonte in circuito.fontesDeCorrenteDC:
         vetor = adicionarFonteDeDCCorrente(vetor, fonte)
 
-    return numpy.linalg.solve(matriz[1:, 1:], vetor[1: ])
+    # return numpy.linalg.solve(matriz[1:, 1:], vetor[1: ])
+    print(circuito)
+    return ndarray([])
 
 if __name__ == "__main__":
     arquivos = ["netlist1.txt", "netlist2.txt", "netlist3.txt", "netlist4.txt"]

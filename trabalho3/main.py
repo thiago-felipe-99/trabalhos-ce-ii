@@ -2,9 +2,7 @@
 
 import numpy
 from dataclasses import dataclass, field
-from typing import TypeAlias
-
-from numpy.core.multiarray import ndarray
+from typing import TypeAlias, Tuple
 
 @dataclass
 class Resitor:
@@ -94,8 +92,7 @@ VetorDeFontes: TypeAlias = numpy.ndarray
 def lerArquivo(arquivo: str) -> Circuito:
     '''Ele faz a leitura de um arquivo do tipo netlist e retorna o circuito gerado por ela
     '''
-    arquivp = open(arquivo,"r")
-    linhas = arquivp.readlines()
+    linhas = open(arquivo, "r").readlines()
     circuito = Circuito()
 
     for linha in linhas:
@@ -300,13 +297,79 @@ def adicionarFonteDeCorrenteDCControladaTensao(
 
     return matriz
 
-def adicionarFonteDeDCCorrente(vetor: VetorDeFontes, fonte: FonteDeCorrenteDC) -> VetorDeFontes:
+def adicionarFonteDeCorrenteDCControladaCorrente(
+        matriz: MatrizCondutancia, fonte: FonteDeCorrenteDCControladaPorCorrente, maiorNo: int
+) -> MatrizCondutancia:
+    '''Ela adiciona uma fonte de corrente DC controlada por corrente na matriz de 
+    condutância do circuito'''
+    posicao = maiorNo + fonte.posicaoVariavelDeCorrente
+
+    matriz[fonte.no1][posicao] += fonte.valor
+    matriz[fonte.no2][posicao] -= fonte.valor
+    matriz[fonte.no3][posicao] += 1
+    matriz[fonte.no4][posicao] -= 1
+    matriz[posicao][fonte.no3] -= 1
+    matriz[posicao][fonte.no4] += 1
+
+    return matriz
+
+def adicionarFonteDeTensaoDCControladaTensao(
+        matriz: MatrizCondutancia, fonte: FonteDeTensaoDCControladaPorTensao, maiorNo: int
+) -> MatrizCondutancia:
+    '''Ela adiciona uma fonte de tensão DC controlada por tensão na matriz de 
+    condutância do circuito'''
+    posicao = maiorNo + fonte.posicaoVariavelDeCorrente
+
+    matriz[fonte.no1][posicao] += 1
+    matriz[fonte.no2][posicao] -= 1
+    matriz[posicao][fonte.no1] -= 1
+    matriz[posicao][fonte.no2] += 1
+    matriz[posicao][fonte.no3] += fonte.valor
+    matriz[posicao][fonte.no4] -= fonte.valor
+
+    return matriz
+
+def adicionarFonteDeTensaoDCControladaCorrente(
+        matriz: MatrizCondutancia, fonte: FonteDeTensaoDCControladaPorCorrente, maiorNo: int
+) -> MatrizCondutancia:
+    '''Ela adiciona uma fonte de tensão DC controlada por corrente na matriz de 
+    condutância do circuito'''
+    posicao1 = maiorNo + fonte.posicaoVariavelDeCorrente1
+    posicao2 = maiorNo + fonte.posicaoVariavelDeCorrente2
+
+    matriz[fonte.no1][posicao2] += 1
+    matriz[fonte.no2][posicao2] -= 1
+    matriz[fonte.no3][posicao1] += 1
+    matriz[fonte.no4][posicao1] -= 1
+    matriz[posicao1][fonte.no3] -= 1
+    matriz[posicao1][fonte.no4] += 1
+    matriz[posicao2][fonte.no1] -= 1
+    matriz[posicao2][fonte.no2] += 1
+    matriz[posicao2][posicao1] += fonte.valor
+
+    return matriz
+
+def adicionarFonteDeCorrenteDC(vetor: VetorDeFontes, fonte: FonteDeCorrenteDC) -> VetorDeFontes:
     '''Ela adiciona uma fonte de corrente DC no vetor de fontes do circuito'''
     vetor[fonte.no1] -= fonte.valor
     vetor[fonte.no2] += fonte.valor
 
     return vetor
 
+def adicionarFonteDeTensaoDC(
+        matriz: MatrizCondutancia, vetor: VetorDeFontes, fonte: FonteDeTensaoDC, maiorNo: int
+) -> Tuple[MatrizCondutancia,VetorDeFontes]:
+    '''Ela adiciona uma fonte de tensão DC na matriz de continue e no vetor de fontes do circuito'''
+    posicao = maiorNo + fonte.posicaoVariavelDeCorrente
+
+    vetor[posicao] -= fonte.valor
+
+    matriz[fonte.no1][posicao] += 1
+    matriz[fonte.no2][posicao] -= 1
+    matriz[posicao][fonte.no1] -= 1
+    matriz[posicao][fonte.no2] += 1
+
+    return matriz, vetor
 
 def main(arquivo: str) -> numpy.ndarray:
     '''Função principal onde ele ler um arquivo do formato de uma netlist, faz a solução
@@ -314,8 +377,9 @@ def main(arquivo: str) -> numpy.ndarray:
 
     circuito = lerArquivo(arquivo)
     maiorNo = pegarMaiorNo(circuito)
-    matriz = numpy.zeros((maiorNo+1, maiorNo+1), dtype=float)
-    vetor = numpy.zeros((maiorNo+1), dtype=float)
+    dimensao = maiorNo + circuito.quantidadeDeVariaveisDeCorrente + 1
+    matriz = numpy.zeros((dimensao, dimensao), dtype=float)
+    vetor = numpy.zeros((dimensao), dtype=float)
 
     for resitor in circuito.resitores:
         matriz = adicionarResitor(matriz, resitor)
@@ -323,16 +387,26 @@ def main(arquivo: str) -> numpy.ndarray:
     for fonte in circuito.fontesDeCorrenteDCControladaPorTensao:
         matriz = adicionarFonteDeCorrenteDCControladaTensao(matriz, fonte)
 
-    for fonte in circuito.fontesDeCorrenteDC:
-        vetor = adicionarFonteDeDCCorrente(vetor, fonte)
+    for fonte in circuito.fontesDeCorrenteDCControladaPorCorrente:
+        matriz = adicionarFonteDeCorrenteDCControladaCorrente(matriz, fonte, maiorNo)
 
-    # return numpy.linalg.solve(matriz[1:, 1:], vetor[1: ])
-    print(maiorNo)
-    print(circuito.quantidadeDeVariaveisDeCorrente)
-    return ndarray([])
+    for fonte in circuito.fontesDeTensaoDCControladaPorTensao:
+        matriz = adicionarFonteDeTensaoDCControladaTensao(matriz, fonte, maiorNo)
+
+    for fonte in circuito.fontesDeTensaoDCControladaPorCorrente:
+        matriz = adicionarFonteDeTensaoDCControladaCorrente(matriz, fonte, maiorNo)
+
+    for fonte in circuito.fontesDeCorrenteDC:
+        vetor = adicionarFonteDeCorrenteDC(vetor, fonte)
+
+    for fonte in circuito.fontesDeTensaoDC:
+        matriz, vetor = adicionarFonteDeTensaoDC(matriz, vetor, fonte, maiorNo)
+
+    return numpy.linalg.solve(matriz[1:, 1:], vetor[1: ])
 
 if __name__ == "__main__":
     arquivos = ["netlist1.txt", "netlist2.txt", "netlist3.txt", "netlist4.txt"]
 
-    for arquivo in arquivos:
-        print(main(arquivo))
+    with numpy.printoptions(formatter={'float': '{: 0.3f}'.format}):
+        for arquivo in arquivos:
+            print(main(arquivo))

@@ -4,6 +4,8 @@ import numpy
 from dataclasses import dataclass, field
 from typing import TypeAlias
 
+from numpy.core.multiarray import ndarray
+
 @dataclass
 class Resitor:
     '''Representa um ramo com resitor'''
@@ -11,36 +13,6 @@ class Resitor:
     no1: int
     no2: int
     valor: float
-
-@dataclass
-class Indutor:
-    '''Representa um ramo com indutor'''
-    identificacao: str
-    no1: int
-    no2: int
-    valor: float
-    condicaoInicial: float
-
-@dataclass
-class Capacitor:
-    '''Representa um ramo com capacitor'''
-    identificacao: str
-    no1: int
-    no2: int
-    valor: float
-    condicaoInicial: float
-
-@dataclass
-class Transformador:
-    '''Representa um ramo com um transformador'''
-    identificacao: str
-    no1: int
-    no2: int
-    no3: int
-    no4: int
-    valorIndutancia1: float
-    valorIndutancia2: float
-    valorIndutanciaMutua: float
 
 @dataclass
 class FonteDeCorrenteDC:
@@ -117,40 +89,42 @@ def lerArquivo(arquivo: str) -> Circuito:
     circuito = Circuito()
 
     for linha in linhas:
-        if not len(linha.strip()) == 0 and not linha[0] == "*":
-            componente = linha.split()
+        if len(linha.strip()) == 0 or linha[0] == "*":
+            continue 
 
-            if componente[0][0] == "R":
-                identificacao = componente[0][1:]
-                no1 = int(componente[1])
-                no2 = int(componente[2])
-                valor = float(componente[3])
+        componente = linha.split()
 
-                circuito.resitores.append(Resitor(identificacao, no1, no2, valor))
+        if componente[0][0] == "R":
+            identificacao = componente[0][1:]
+            no1 = int(componente[1])
+            no2 = int(componente[2])
+            valor = float(componente[3])
 
-            elif componente[0][0] == "G":
-                identificacao = componente[0][1:]
-                no1 = int(componente[1])
-                no2 = int(componente[2])
-                no3 = int(componente[3])
-                no4 = int(componente[4])
-                valor = float(componente[5])
+            circuito.resitores.append(Resitor(identificacao, no1, no2, valor))
 
-                circuito.fontesDeCorrenteDCControladaPorTensao.append(
-                    FonteDeCorrenteDCControladaPorTensao(
-                        identificacao, no1, no2, no3, no4, valor
-                    )
+        elif componente[0][0] == "G":
+            identificacao = componente[0][1:]
+            no1 = int(componente[1])
+            no2 = int(componente[2])
+            no3 = int(componente[3])
+            no4 = int(componente[4])
+            valor = float(componente[5])
+
+            circuito.fontesDeCorrenteDCControladaPorTensao.append(
+                FonteDeCorrenteDCControladaPorTensao(
+                    identificacao, no1, no2, no3, no4, valor
                 )
+            )
 
-            elif componente[0][0] == "I":
-                identificacao = componente[0][1:]
-                no1 = int(componente[1])
-                no2 = int(componente[2])
-                valor = float(componente[4])
+        elif componente[0][0] == "I":
+            identificacao = componente[0][1:]
+            no1 = int(componente[1])
+            no2 = int(componente[2])
+            valor = float(componente[4])
 
-                circuito.fontesDeCorrenteDC.append(
-                    FonteDeCorrenteDC(identificacao, no1, no2, valor)
-                )
+            circuito.fontesDeCorrenteDC.append(
+                FonteDeCorrenteDC(identificacao, no1, no2, valor)
+            )
 
     return circuito
 
@@ -238,7 +212,7 @@ def main(arquivo: str) -> numpy.ndarray:
     return numpy.linalg.solve(matriz[1:, 1:], vetor[1: ])
 
 if __name__ == "__main__":
-    arquivos = ["netlist0.txt", "netlist1.txt", "netlist2.txt", "netlist3.txt"]
+    arquivos = ["netlist1.txt", "netlist2.txt", "netlist3.txt", "netlist4.txt"]
 
     for arquivo in arquivos:
         print(main(arquivo))

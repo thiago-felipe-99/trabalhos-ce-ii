@@ -1,97 +1,77 @@
 import numpy as np
-from matplotlib import pyplot
 
-#################################################
-# Valores validos para todas as simulacoes
-deltaT = 1e-3
+def adicionarResistor(G,no1,no2,R):
+    G[no1,no1] = G[no1,no1] + 1/R
+    G[no1,no2] = G[no1,no2] - 1/R
+    G[no2,no1] = G[no2,no1] - 1/R
+    G[no2,no2] = G[no2,no2] + 1/R
+    return G
 
-tFinal = 20e-3
+def adicionarFonteCorrente(I,no1,no2,iin):
+    I[no1] = I[no1] - iin
+    I[no2] = I[no2] + iin
+    return I
 
-nPontos = int(tFinal/deltaT)
+def adicionarResistorQuadratico(G,I,no1,no2,e):
+    e = np.concatenate((np.array([0]),e))
+    G0 = 2*(e[no1]-e[no2])
+    I0 = (e[no1]-e[no2])**2 - G0*(e[no1]-e[no2])
+    G = adicionarResistor(G,no1,no2,1/G0)
+    I = adicionarFonteCorrente(I,no1,no2,I0)
+    return G,I
 
-Iin = np.ones(nPontos)*10
-pontosSubida = 10
+def adicionarTrancondutor(G,no1,no2,no3,no4,Gm):
+    G[no1,no3] = G[no1,no3] + Gm
+    G[no1,no4] = G[no1,no4] - Gm
+    G[no2,no3] = G[no2,no3] - Gm
+    G[no2,no4] = G[no2,no4] + Gm
+    return G
 
-Iin[0:pontosSubida] = np.linspace(0,10,pontosSubida)
+def adicionarFonteInversa(G,I,no1,no2,no3,no4,e):
+    e = np.concatenate((np.array([0]),e))
+    Gm = -1/((e[no3]-e[no4])**2)
+    If = 1/(e[no3]-e[no4]) - Gm*(e[no3]-e[no4])
 
-tempo = np.arange(0,nPontos)*deltaT
+    G = adicionarTrancondutor(G,no1,no2,no3,no4,Gm)
+    
+    I = adicionarFonteCorrente(I,no1,no2,If)
+    
+    return G,I
+    
 
-# Plot da entrada:
-pyplot.plot(tempo*1e3,Iin)
-#################################################
+k = 100
 
-#################################################
-# Backward Euler
-vc = np.zeros(nPontos)
-R = 1
-C = 2e-3
+eit0 = np.array([1.5,0])
+epsilon = 0.001
 
-G = np.array([[1/R + C/deltaT]])
+Gref = np.zeros([3,3])
+Iref = np.zeros(3)
+Gref = adicionarResistor(Gref,1,2,2)
+Iref = adicionarFonteCorrente(Iref,0,1,2)
 
-for i in range(1,len(Iin)):
-    I = np.array(Iin[i]+(C/deltaT)*vc[i-1])
-    vc[i] = np.linalg.inv(G).dot(I)
+while k > 0:
 
-pyplot.plot(tempo*1e3,vc)
-#################################################
+    G = np.copy(Gref)
+    I = np.copy(Iref)
+    
+    G,I = adicionarResistorQuadratico(G,I,1,0,eit0)
 
-#################################################
-# Forward Euler
-vc = np.zeros(nPontos)
-ic = np.zeros(nPontos)
+    G,I = adicionarFonteInversa(G,I,2,0,1,2,eit0)
 
-R = 1
-C = 2e-3
 
-G = np.array([[1/R, 1],[-1, 0]])
+    G = G[1:,1:]
+    I = I[1:]
+    eitn = np.linalg.inv(G).dot(I)
 
-for i in range(1,len(Iin)):
-    I = np.array([Iin[i-1],-(vc[i-1]+(deltaT/C)*ic[i-1])])
-    e = np.linalg.inv(G).dot(I)
-    vc[i] = e[0]
-    ic[i] = e[1]
+    d = np.max(np.abs(eitn-eit0))
+    if d < epsilon:
+        break
 
-pyplot.plot(tempo*1e3,vc,'--')
-#################################################
+    print(eitn)
+    eit0 = eitn
+    
+    k = k-1
 
-#################################################
-# Trapezios - 1
-vc = np.zeros(nPontos)
+print(eitn)
+print(100-k)
 
-R = 1
-C = 2e-3
-
-G = np.array([[1/R+2*C/deltaT]])
-it0 = 0
-
-for i in range(1,len(Iin)):
-    I = np.array([Iin[i-1]+(2*C/deltaT)*vc[i-1]+it0])
-    e = np.linalg.inv(G).dot(I)
-    vc[i] = e[0]
-    it0 = 2*C/deltaT*vc[i]-(2*C/deltaT)*vc[i-1]-it0
-
-pyplot.plot(tempo*1e3,vc,'-.')
-vc1=vc
-#################################################
-
-#################################################
-# Trapezios - 2 - usando analise nodal modificada
-vc = np.zeros(nPontos)
-ic = np.zeros(nPontos)
-
-R = 1
-C = 2e-3
-
-G = np.array([[1/R, 1],\
-              [-1, deltaT/(2*C)]])
-
-for i in range(1,len(Iin)):
-    I = np.array([Iin[i-1],-(vc[i-1]+(deltaT/(2*C))*ic[i-1])])
-    e = np.linalg.inv(G).dot(I)
-    vc[i] = e[0]
-    ic[i] = e[1]
-
-pyplot.plot(tempo*1e3,vc,'.')
-#################################################
-pyplot.show()
-pyplot.close()

@@ -1,6 +1,9 @@
 """Resolução do trabalho 4 de Circuitos Elétricos II."""
 from dataclasses import dataclass
 from dataclasses import field
+from math import cos
+from math import exp
+from math import pi
 from typing import List
 from typing import Tuple
 from typing import TypeAlias
@@ -159,6 +162,17 @@ class FonteDeTensaoControladaPorCorrente:
 
 
 @dataclass
+class Diodo:
+    """Representa um ramo com diodo."""
+
+    identificacao: str
+    no1: int
+    no2: int
+    i_s: float
+    nvt: float
+
+
+@dataclass
 # pylint: disable-next=too-many-instance-attributes
 class Circuito:
     """Representa quais são os componentes de um circuito elétrico."""
@@ -183,11 +197,13 @@ class Circuito:
         default_factory=list)
     fontes_de_tensao_controlada_por_corrente: list[FonteDeTensaoControladaPorCorrente] = field(
         default_factory=list)
+    diodos: list[Diodo] = field(default_factory=list)
     quantidade_de_variaveis_de_corrente: int = 0
 
 
 MatrizCondutancia: TypeAlias = numpy.ndarray
 VetorDeFontes: TypeAlias = numpy.ndarray
+VetorDeTensoes: TypeAlias = numpy.ndarray
 
 
 # pylint: disable-next=too-many-statements,too-many-branches,too-many-locals
@@ -375,6 +391,15 @@ def ler_linha(linha: str, circuito: Circuito):
 
         circuito.quantidade_de_variaveis_de_corrente += 1
 
+    elif componente[0][0] == "D":
+        identificacao = componente[0][1:]
+        no1 = int(componente[1])
+        no2 = int(componente[2])
+        i_s = float(componente[3])
+        nvt = float(componente[4])
+
+        circuito.diodos.append(Diodo(identificacao, no1, no2, i_s, nvt))
+
 
 def ler_arquivo(nome_arquivo: str) -> Circuito:
     """Ele faz a leitura de um arquivo do tipo netlist e retorna o circuito gerado por ela."""
@@ -392,7 +417,7 @@ def ler_arquivo(nome_arquivo: str) -> Circuito:
 
 elemento_2_nos = Resitor | FonteDeTensaoDC | FonteDeCorrenteDC |\
     FonteDeCorrenteSenoidal | FonteDeTensaoSenoidal |\
-    FonteDeCorrentePulso | FonteDeTensaoPulso
+    FonteDeCorrentePulso | FonteDeTensaoPulso | Diodo
 
 
 def maior_de_2_nos(
@@ -469,6 +494,9 @@ def pegar_maior_no(circuito: Circuito) -> int:  # noqa: C901
 
     for fonte_tensao_corrente in circuito.fontes_de_tensao_controlada_por_corrente:
         maior_no = maior_de_4_nos(fonte_tensao_corrente, maior_no)
+
+    for diodo in circuito.diodos:
+        maior_no = maior_de_2_nos(diodo, maior_no)
 
     return maior_no
 
@@ -568,6 +596,66 @@ def adicionar_fonte_de_corrente_dc(
     return vetor
 
 
+def adicionar_fonte_de_corrente_senoidal(
+    vetor: VetorDeFontes,
+    fonte: FonteDeCorrenteSenoidal,
+    tempo_atual: float
+) -> VetorDeFontes:
+    """Ela adiciona uma fonte de corrente senoidal no vetor de fontes do circuito."""
+    tempo = 2 * pi * fonte.frequencia_hz * tempo_atual
+    fase = fonte.fase_graus * (pi / 180)
+    valor = (fonte.amplitude * cos(tempo + fase)) + fonte.valor
+
+    fonte_dc = FonteDeCorrenteDC(
+        fonte.identificacao,
+        fonte.no1,
+        fonte.no2,
+        valor
+    )
+
+    return adicionar_fonte_de_corrente_dc(vetor, fonte_dc)
+
+
+def adicionar_fonte_de_corrente_pulso(
+    vetor: VetorDeFontes,
+    fonte: FonteDeCorrentePulso,
+    tempo_atual: float
+) -> VetorDeFontes:
+    """Ela adiciona uma fonte de corrente senoidal no vetor de fontes do circuito."""
+    if fonte.delay >= tempo_atual:
+        fonte_dc = FonteDeCorrenteDC(
+            fonte.identificacao,
+            fonte.no1,
+            fonte.no2,
+            fonte.valor1
+        )
+
+        return adicionar_fonte_de_corrente_dc(vetor, fonte_dc)
+
+    tempo = (tempo_atual - fonte.delay) % fonte.periodo
+    v_min, v_max = fonte.valor1, fonte.valor2
+    t_subida, t_descida, t_on = fonte.tempo_subida, fonte.tempo_descida, fonte.tempo_v2
+
+    if tempo <= t_subida:
+        valor = v_min + (((v_min - v_max) * tempo) / t_subida)
+    elif tempo <= (t_subida + t_on):
+        valor = v_max
+    elif tempo <= (t_subida + t_on + t_descida):
+        valor = v_max - \
+            (((v_max - v_min) * (tempo - t_on - t_subida)) / t_descida)
+    else:
+        valor = v_min
+
+    fonte_dc = FonteDeCorrenteDC(
+        fonte.identificacao,
+        fonte.no1,
+        fonte.no2,
+        valor
+    )
+
+    return adicionar_fonte_de_corrente_dc(vetor, fonte_dc)
+
+
 def adicionar_fonte_de_tensao_dc(
         matriz: MatrizCondutancia,
         vetor: VetorDeFontes,
@@ -587,18 +675,101 @@ def adicionar_fonte_de_tensao_dc(
     return matriz, vetor
 
 
-# pylint: disable-next=too-many-arguments,too-many-locals
-def main(
-        nome_arquivo: str,
-        duracao: float,
-        passo: float,
-        tolerancia: float,
-        tensoes_inciais: List[float],
-        nos_desejados: List[int]
-) -> numpy.ndarray:
-    """Função principal onde ele ler um arquivo do formato de uma netlist, faz a solução do circuito e retorna ela."""
-    circuito = ler_arquivo(nome_arquivo)
-    maior_no = pegar_maior_no(circuito)
+def adicionar_fonte_de_tensao_senoidal(
+    matriz: MatrizCondutancia,
+    vetor: VetorDeFontes,
+    fonte: FonteDeTensaoSenoidal,
+    maior_no: int,
+    tempo_atual: float
+) -> Tuple[MatrizCondutancia, VetorDeFontes]:
+    """Ela adiciona uma fonte de corrente senoidal no vetor de fontes do circuito."""
+    tempo = 2 * pi * fonte.frequencia_hz * tempo_atual
+    fase = fonte.fase_graus * (pi / 180)
+    valor = (fonte.amplitude * cos(tempo + fase)) + fonte.valor
+
+    fonte_dc = FonteDeTensaoDC(
+        fonte.identificacao,
+        fonte.no1,
+        fonte.no2,
+        valor,
+        fonte.posicao_variavel_de_corrente
+    )
+
+    return adicionar_fonte_de_tensao_dc(matriz, vetor, fonte_dc, maior_no)
+
+
+def adicionar_fonte_de_tensao_pulso(
+    matriz: MatrizCondutancia,
+    vetor: VetorDeFontes,
+    fonte: FonteDeTensaoPulso,
+    maior_no: int,
+    tempo_atual: float
+) -> Tuple[MatrizCondutancia, VetorDeFontes]:
+    """Ela adiciona uma fonte de corrente senoidal no vetor de fontes do circuito."""
+    if fonte.delay >= tempo_atual:
+        fonte_dc = FonteDeTensaoDC(
+            fonte.identificacao,
+            fonte.no1,
+            fonte.no2,
+            fonte.valor1,
+            fonte.posicao_variavel_de_corrente
+        )
+
+        return adicionar_fonte_de_tensao_dc(matriz, vetor, fonte_dc, maior_no)
+
+    tempo = (tempo_atual - fonte.delay) % fonte.periodo
+    v_min, v_max = fonte.valor1, fonte.valor2
+    t_subida, t_descida, t_on = fonte.tempo_subida, fonte.tempo_descida, fonte.tempo_v2
+
+    if tempo <= t_subida:
+        valor = v_min + (((v_min - v_max) * tempo) / t_subida)
+    elif tempo <= (t_subida + t_on):
+        valor = v_max
+    elif tempo <= (t_subida + t_on + t_descida):
+        valor = v_max - \
+            (((v_max - v_min) * (tempo - t_on - t_subida)) / t_descida)
+    else:
+        valor = v_min
+
+    fonte_dc = FonteDeTensaoDC(
+        fonte.identificacao,
+        fonte.no1,
+        fonte.no2,
+        valor,
+        fonte.posicao_variavel_de_corrente
+    )
+
+    return adicionar_fonte_de_tensao_dc(matriz, vetor, fonte_dc, maior_no)
+
+
+def adicionar_diodo(
+    matriz: MatrizCondutancia,
+    vetor: VetorDeFontes,
+    diodo: Diodo,
+    tensoes_inciais: VetorDeTensoes
+) -> Tuple[MatrizCondutancia, VetorDeFontes]:
+    """Adiciona um diodo na matriz de condutancia e no vetor de fontes."""
+    tensao_no = tensoes_inciais[diodo.no1] - tensoes_inciais[diodo.no2]
+    i_s = diodo.i_s * exp(tensao_no / diodo.nvt)
+    conduntancia = i_s / diodo.nvt
+    corrente = i_s - diodo.i_s - (conduntancia * tensao_no)
+
+    resitor = Resitor(diodo.identificacao, diodo.no1,
+                      diodo.no2, 1.0 / conduntancia)
+    fonte = FonteDeCorrenteDC(
+        diodo.identificacao, diodo.no1, diodo.no2, corrente)
+
+    matriz = adicionar_resitor(matriz, resitor)
+    fonte = adicionar_fonte_de_corrente_dc(vetor, fonte)
+
+    return matriz, vetor
+
+
+def criar_matriz_e_vetor_de_elementos_constantes(
+        circuito: Circuito,
+        maior_no: int,
+) -> Tuple[MatrizCondutancia, VetorDeFontes]:
+    """Cria a matriz de condutancia e vetor de fontes de elementos constantes."""
     dimensao = maior_no + circuito.quantidade_de_variaveis_de_corrente + 1
     matriz = numpy.zeros((dimensao, dimensao), dtype=float)
     vetor = numpy.zeros((dimensao), dtype=float)
@@ -644,13 +815,125 @@ def main(
             maior_no
         )
 
+    return matriz, vetor
+
+
+def adicionar_elementos_temporais(
+    circuito: Circuito,
+    matriz: MatrizCondutancia,
+    vetor: VetorDeFontes,
+    maior_no: int,
+    tempo_atual: float
+) -> Tuple[MatrizCondutancia, VetorDeFontes]:
+    """Função resolve um circuito em um dado momento a partir da matriz e vetores de elementos constantes."""
+    for fonte_corrente_senoidal in circuito.fontes_de_corrente_senoidal:
+        vetor = adicionar_fonte_de_corrente_senoidal(
+            vetor,
+            fonte_corrente_senoidal,
+            tempo_atual
+        )
+
+    for fonte_tensao_senoidal in circuito.fontes_de_tensao_senoidal:
+        matriz, vetor = adicionar_fonte_de_tensao_senoidal(
+            matriz,
+            vetor,
+            fonte_tensao_senoidal,
+            maior_no,
+            tempo_atual
+        )
+
+    for fonte_corrente_pulso in circuito.fontes_de_corrente_pulso:
+        vetor = adicionar_fonte_de_corrente_pulso(
+            vetor,
+            fonte_corrente_pulso,
+            tempo_atual
+        )
+
+    for fonte_tensao_pulso in circuito.fontes_de_tensao_pulso:
+        matriz, vetor = adicionar_fonte_de_tensao_pulso(
+            matriz,
+            vetor,
+            fonte_tensao_pulso,
+            maior_no,
+            tempo_atual
+        )
+
+    return matriz, vetor
+
+
+def calcula_circuito_nao_linear(
+    circuito: Circuito,
+    matriz_temporal: MatrizCondutancia,
+    vetor_temporal: VetorDeFontes,
+    tensoes_iniciais: VetorDeTensoes,
+    tolerancia: float
+) -> numpy.ndarray:
+    maxima_interacoes = 1000
+
+    matriz, vetor = numpy.copy(matriz_temporal), numpy.copy(vetor_temporal)
+    while maxima_interacoes > 0:
+        for diodo in circuito.diodos:
+            matriz, vetor = adicionar_diodo(
+                matriz, vetor, diodo, tensoes_iniciais)
+
+        resultado_parcial = numpy.linalg.solve(matriz[1:, 1:], vetor[1:])
+
+        max_diff = numpy.max(numpy.abs(tensoes_iniciais - resultado_parcial))
+
+        if max_diff < tolerancia:
+            break
+
+        tensoes_inciais = resultado_parcial
+        maxima_interacoes = maxima_interacoes - 1
+        matriz, vetor = numpy.copy(matriz_temporal), numpy.copy(vetor_temporal)
+
     return numpy.linalg.solve(matriz[1:, 1:], vetor[1:])
+
+
+# pylint: disable-next=too-many-arguments,too-many-locals
+def main(
+        nome_arquivo: str,
+        duracao: float,
+        delta: float,
+        tolerancia: float,
+        tensoes: List[float],
+        nos_desejados: List[int]
+):  # -> numpy.ndarray:
+    """Função principal onde ele ler um arquivo do formato de uma netlist, faz a solução do circuito e retorna ela."""
+    circuito = ler_arquivo(nome_arquivo)
+    maior_no = pegar_maior_no(circuito)
+    matriz_inicial, vetor_inicial = criar_matriz_e_vetor_de_elementos_constantes(
+        circuito, maior_no)
+
+    quantidade_pontos = int(duracao / delta) + 1
+
+    tempo = numpy.arange(0, quantidade_pontos) * delta
+
+    dimensao = maior_no + circuito.quantidade_de_variaveis_de_corrente
+    resultados = numpy.zeros((quantidade_pontos, dimensao), dtype=float)
+
+    for index, tempo_atual in enumerate(tempo):
+        tensoes_iniciais = numpy.array(tensoes.copy())
+        numpy.pad(tensoes_iniciais, (0, circuito.quantidade_de_variaveis_de_corrente), 'constant')
+
+        matriz_temporal, vetor_temporal = numpy.copy(matriz_inicial), numpy.copy(vetor_inicial)
+        matriz_temporal, vetor_temporal = adicionar_elementos_temporais(circuito, matriz_temporal, vetor_temporal, maior_no, tempo_atual)
+
+        if len(circuito.diodos) <= 0:
+            resultados[index] = numpy.linalg.solve(matriz_temporal[1:, 1:], vetor_temporal[1:])
+        else:
+            resultados[index] = calcula_circuito_nao_linear(circuito, matriz_temporal, vetor_temporal, tensoes_iniciais, tolerancia)
+
+    resultados = resultados.transpose()
+    nos_desejados = list(map(lambda x: x - 1, nos_desejados))
+
+    return resultados[nos_desejados]
 
 
 if __name__ == "__main__":
     arquivos = ["netlist1.txt", "netlist2.txt", "netlist3.txt", "netlist4.txt"]
 
-    with numpy.printoptions(formatter={'float': '{: 0.3f}'.format}):
+    with numpy.printoptions(formatter={'float': '{: 0.8f}'.format}):
         print(main("netlist1.txt", 1e-3, 0.2e-3, 1e-4, [1, 0.5], [1, 2]))
         print(main("netlist2.txt", 1e-3, 0.2e-3, 1e-4, [1, 0], [1, 2]))
         print(main("netlist3.txt", 1e-3, 0.2e-3, 1e-4, [10, 0], [1, 2]))

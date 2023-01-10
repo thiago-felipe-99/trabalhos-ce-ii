@@ -1,18 +1,17 @@
+# pylint: disable=too-many-lines, disable=line-too-long
 """Resolução do trabalho 4 de Circuitos Elétricos II."""
 from dataclasses import dataclass
 from dataclasses import field
 from math import cos
 from math import exp
 from math import pi
+from math import inf
 from typing import List
 from typing import Tuple
 from typing import TypeAlias
 
 import numpy
 from matplotlib import pyplot
-
-
-# pylint: disable=line-too-long
 
 
 @dataclass
@@ -193,6 +192,7 @@ class Indutor:
     no2: int
     valor: float
     condicao_inicial: float
+    posicao_variavel_de_corrente: int
 
 
 @dataclass
@@ -208,6 +208,8 @@ class Transformador:
     valor1: float
     valor2: float
     valor_mutuo: float
+    posicao_variavel_de_corrente1: int
+    posicao_variavel_de_corrente2: int
 
 
 @dataclass
@@ -458,7 +460,8 @@ def ler_linha(linha: str, circuito: Circuito):
         condicao_inicial = float(componente[4])
 
         circuito.capacitores.append(
-            Capacitor(identificacao, no1, no2, valor, condicao_inicial))
+            Capacitor(identificacao, no1, no2, valor, condicao_inicial)
+        )
 
     elif componente[0][0] == "L":
         identificacao = componente[0][1:]
@@ -466,9 +469,13 @@ def ler_linha(linha: str, circuito: Circuito):
         no2 = int(componente[2])
         valor = float(componente[3])
         condicao_inicial = float(componente[4])
+        posicao = circuito.quantidade_de_variaveis_de_corrente + 1
 
         circuito.indutores.append(
-            Indutor(identificacao, no1, no2, valor, condicao_inicial))
+            Indutor(identificacao, no1, no2, valor, condicao_inicial, posicao)
+        )
+
+        circuito.quantidade_de_variaveis_de_corrente += 1
 
     elif componente[0][0] == "K":
         identificacao = componente[0][1:]
@@ -479,17 +486,25 @@ def ler_linha(linha: str, circuito: Circuito):
         valor1 = float(componente[5])
         valor2 = float(componente[6])
         valor_mutuo = float(componente[7])
+        posicao1 = circuito.quantidade_de_variaveis_de_corrente + 1
+        posicao2 = posicao1 + 1
 
-        circuito.transformadores.append(Transformador(
-            identificacao,
-            no1,
-            no2,
-            no3,
-            no4,
-            valor1,
-            valor2,
-            valor_mutuo
-        ))
+        circuito.transformadores.append(
+            Transformador(
+                identificacao,
+                no1,
+                no2,
+                no3,
+                no4,
+                valor1,
+                valor2,
+                valor_mutuo,
+                posicao1,
+                posicao2
+            )
+        )
+
+        circuito.quantidade_de_variaveis_de_corrente += 2
 
 
 def ler_arquivo(nome_arquivo: str) -> Circuito:
@@ -550,6 +565,7 @@ def maior_de_4_nos(
     return no_atual
 
 
+# pylint: disable-next=too-many-branches,too-many-locals
 def pegar_maior_no(circuito: Circuito) -> int:  # noqa: C901
     """Retorna qual é o maior nó do circuito."""
     maior_no = 0
@@ -603,8 +619,8 @@ def pegar_maior_no(circuito: Circuito) -> int:  # noqa: C901
 
 
 def adicionar_resitor(
-        matriz: MatrizCondutancia,
-        resitor: Resitor
+    matriz: MatrizCondutancia,
+    resitor: Resitor
 ) -> MatrizCondutancia:
     """Ela adiciona um resitor na matriz de condutância do circuito."""
     matriz[resitor.no1][resitor.no1] += 1 / resitor.valor
@@ -616,8 +632,8 @@ def adicionar_resitor(
 
 
 def adicionar_fonte_de_corrente_dc_controlada_tensao(
-        matriz: MatrizCondutancia,
-        fonte: FonteDeCorrenteDCControladaPorTensao
+    matriz: MatrizCondutancia,
+    fonte: FonteDeCorrenteDCControladaPorTensao
 ) -> MatrizCondutancia:
     """Ela adiciona uma fonte de corrente DC controlada por tensão na matriz de condutância do circuito."""
     matriz[fonte.no1][fonte.no3] += fonte.valor
@@ -629,9 +645,9 @@ def adicionar_fonte_de_corrente_dc_controlada_tensao(
 
 
 def adicionar_fonte_de_corrente_dc_controlada_corrente(
-        matriz: MatrizCondutancia,
-        fonte: FonteDeCorrenteControladaPorCorrente,
-        maior_no: int
+    matriz: MatrizCondutancia,
+    fonte: FonteDeCorrenteControladaPorCorrente,
+    maior_no: int
 ) -> MatrizCondutancia:
     """Adiciona uma fonte de corrente DC controlada por corrente na matriz de condutância do circuito."""
     posicao = maior_no + fonte.posicao_variavel_de_corrente
@@ -647,9 +663,9 @@ def adicionar_fonte_de_corrente_dc_controlada_corrente(
 
 
 def adicionar_conte_de_tensao_dc_controlada_tensao(
-        matriz: MatrizCondutancia,
-        fonte: FonteDeTensaoControladaPorTensao,
-        maior_no: int
+    matriz: MatrizCondutancia,
+    fonte: FonteDeTensaoControladaPorTensao,
+    maior_no: int
 ) -> MatrizCondutancia:
     """Ela adiciona uma fonte de tensão DC controlada por tensão na matriz de condutância do circuito."""
     posicao = maior_no + fonte.posicao_variavel_de_corrente
@@ -665,9 +681,9 @@ def adicionar_conte_de_tensao_dc_controlada_tensao(
 
 
 def adicionar_fonte_de_tensao_dc_controlada_corrente(
-        matriz: MatrizCondutancia,
-        fonte: FonteDeTensaoControladaPorCorrente,
-        maior_no: int
+    matriz: MatrizCondutancia,
+    fonte: FonteDeTensaoControladaPorCorrente,
+    maior_no: int
 ) -> MatrizCondutancia:
     """Ela adiciona uma fonte de tensão DC controlada por corrente na matriz de condutância do circuito."""
     posicao1 = maior_no + fonte.posicao_variavel_de_corrente1
@@ -687,8 +703,8 @@ def adicionar_fonte_de_tensao_dc_controlada_corrente(
 
 
 def adicionar_fonte_de_corrente_dc(
-        vetor: VetorDeFontes,
-        fonte: FonteDeCorrenteDC
+    vetor: VetorDeFontes,
+    fonte: FonteDeCorrenteDC
 ) -> VetorDeFontes:
     """Ela adiciona uma fonte de corrente DC no vetor de fontes do circuito."""
     vetor[fonte.no1] -= fonte.valor
@@ -758,10 +774,10 @@ def adicionar_fonte_de_corrente_pulso(
 
 
 def adicionar_fonte_de_tensao_dc(
-        matriz: MatrizCondutancia,
-        vetor: VetorDeFontes,
-        fonte: FonteDeTensaoDC,
-        maior_no: int
+    matriz: MatrizCondutancia,
+    vetor: VetorDeFontes,
+    fonte: FonteDeTensaoDC,
+    maior_no: int
 ) -> Tuple[MatrizCondutancia, VetorDeFontes]:
     """Ela adiciona uma fonte de tensão DC na matriz de continue e no vetor de fontes do circuito."""
     posicao = maior_no + fonte.posicao_variavel_de_corrente
@@ -855,11 +871,16 @@ def adicionar_diodo(
     conduntancia = i_s / diodo.nvt
     corrente = i_s - diodo.i_s - (conduntancia * tensao_no)
 
+    if conduntancia == 0:
+        resitencia = inf
+    else:
+        resitencia = 1.0 / conduntancia
+
     resitor = Resitor(
         diodo.identificacao,
         diodo.no1,
         diodo.no2,
-        1.0 / conduntancia
+        resitencia
     )
 
     fonte = FonteDeCorrenteDC(
@@ -875,9 +896,99 @@ def adicionar_diodo(
     return matriz, vetor
 
 
+def adicionar_capacitor(
+    matriz: MatrizCondutancia,
+    vetor: VetorDeFontes,
+    capacitor: Capacitor,
+    tensoes_atuais: VetorDeTensoes,
+    intervalo: float
+) -> Tuple[MatrizCondutancia, VetorDeFontes]:
+    """Adiciona um capacitor na matriz de condutancia e no vetor de fontes."""
+    no1, no2 = capacitor.no1, capacitor.no2
+    resistencia = capacitor.valor / intervalo
+    corrente = resistencia * (tensoes_atuais[no1] - tensoes_atuais[no2])
+
+    resitor = Resitor(capacitor.identificacao, no1, no2, resistencia)
+    fonte = FonteDeCorrenteDC(capacitor.identificacao, no1, no2, corrente)
+
+    matriz = adicionar_resitor(matriz, resitor)
+    vetor = adicionar_fonte_de_corrente_dc(vetor, fonte)
+
+    return matriz, vetor
+
+
+# pylint: disable-next=too-many-arguments
+def adicionar_indutor(
+    matriz: MatrizCondutancia,
+    vetor: VetorDeFontes,
+    indutor: Indutor,
+    tensoes_atuais: VetorDeTensoes,
+    intervalo: float,
+    maior_no: int
+) -> Tuple[MatrizCondutancia, VetorDeFontes]:
+    """Adiciona um capacitor na matriz de condutancia e no vetor de fontes."""
+    no1, no2 = indutor.no1, indutor.no2
+    no_indutor = maior_no + indutor.posicao_variavel_de_corrente
+    resistencia = indutor.valor / intervalo
+    tensao = resistencia * (tensoes_atuais[no_indutor])
+
+    fonte = FonteDeTensaoDC(
+        indutor.identificacao, no2, no1, tensao, indutor.posicao_variavel_de_corrente
+    )
+
+    matriz, vetor = adicionar_fonte_de_tensao_dc(
+        matriz, vetor, fonte, maior_no)
+    matriz[no_indutor][no_indutor] += resistencia
+
+    return matriz, vetor
+
+
+# pylint: disable-next=too-many-arguments,too-many-locals
+def adicionar_transformador(
+    matriz: MatrizCondutancia,
+    vetor: VetorDeFontes,
+    transformador: Transformador,
+    tensoes_atuais: VetorDeTensoes,
+    intervalo: float,
+    maior_no: int
+) -> Tuple[MatrizCondutancia, VetorDeFontes]:
+    """Adiciona um capacitor na matriz de condutancia e no vetor de fontes."""
+    no1, no2 = transformador.no1, transformador.no2
+    no3, no4 = transformador.no3, transformador.no4
+    no_indutor1 = maior_no + transformador.posicao_variavel_de_corrente1
+    no_indutor2 = maior_no + transformador.posicao_variavel_de_corrente2
+
+    indutor1 = transformador.valor1 / intervalo
+    indutor2 = transformador.valor2 / intervalo
+    indutorm = transformador.valor_mutuo / intervalo
+
+    fonte1 = (indutor1 * tensoes_atuais[no_indutor1]) + \
+        (indutorm * tensoes_atuais[no_indutor2])
+    fonte2 = (indutor2 * tensoes_atuais[no_indutor2]) + \
+        (indutorm * tensoes_atuais[no_indutor1])
+
+    matriz[no1][no_indutor1] += 1
+    matriz[no2][no_indutor1] -= 1
+    matriz[no3][no_indutor2] += 1
+    matriz[no4][no_indutor2] -= 1
+    matriz[no_indutor1][no1] -= 1
+    matriz[no_indutor2][no1] += 1
+    matriz[no_indutor1][no3] -= 1
+    matriz[no_indutor2][no4] += 1
+    matriz[no_indutor1][no_indutor1] = indutor1
+    matriz[no_indutor2][no_indutor1] = indutorm
+    matriz[no_indutor1][no_indutor2] = indutorm
+    matriz[no_indutor1][no_indutor2] = indutor1
+
+    vetor[no_indutor1] = fonte1
+    vetor[no_indutor2] = fonte2
+
+    return matriz, vetor
+
+
 def criar_matriz_e_vetor_de_elementos_constantes(
-        circuito: Circuito,
-        maior_no: int,
+    circuito: Circuito,
+    maior_no: int,
 ) -> Tuple[MatrizCondutancia, VetorDeFontes]:
     """Cria a matriz de condutancia e vetor de fontes de elementos constantes."""
     dimensao = maior_no + circuito.quantidade_de_variaveis_de_corrente + 1
@@ -928,12 +1039,14 @@ def criar_matriz_e_vetor_de_elementos_constantes(
     return matriz, vetor
 
 
+# pylint: disable-next=too-many-arguments
 def adicionar_elementos_temporais(
     circuito: Circuito,
     matriz: MatrizCondutancia,
     vetor: VetorDeFontes,
     maior_no: int,
     tempo_atual: float,
+    intervalo: float,
     tensoes_atuais: VetorDeTensoes
 ) -> Tuple[MatrizCondutancia, VetorDeFontes]:
     """Função resolve um circuito em um dado momento a partir da matriz e vetores de elementos constantes."""
@@ -974,7 +1087,28 @@ def adicionar_elementos_temporais(
             matriz,
             vetor,
             capacitor,
-            tensoes_atuais
+            tensoes_atuais,
+            intervalo
+        )
+
+    for indutor in circuito.indutores:
+        matriz, vetor = adicionar_indutor(
+            matriz,
+            vetor,
+            indutor,
+            tensoes_atuais,
+            intervalo,
+            maior_no
+        )
+
+    for transformador in circuito.transformadores:
+        matriz, vetor = adicionar_transformador(
+            matriz,
+            vetor,
+            transformador,
+            tensoes_atuais,
+            intervalo,
+            maior_no
         )
 
     return matriz, vetor
@@ -994,7 +1128,8 @@ def calcula_circuito_nao_linear(
     while maxima_interacoes > 0:
         for diodo in circuito.diodos:
             matriz, vetor = adicionar_diodo(
-                matriz, vetor, diodo, tensoes_iniciais)
+                matriz, vetor, diodo, tensoes_iniciais
+            )
 
         resultado_parcial = numpy.linalg.solve(matriz[1:, 1:], vetor[1:])
 
@@ -1012,22 +1147,23 @@ def calcula_circuito_nao_linear(
 
 # pylint: disable-next=too-many-arguments,too-many-locals
 def main(
-        nome_arquivo: str,
-        duracao: float,
-        delta: float,
-        tolerancia: float,
-        tensoes: List[float],
-        nos_desejados: List[int]
+    nome_arquivo: str,
+    duracao: float,
+    intervalo: float,
+    tolerancia: float,
+    tensoes: List[float],
+    nos_desejados: List[int]
 ):  # -> numpy.ndarray:
     """Função principal onde ele ler um arquivo do formato de uma netlist, faz a solução do circuito e retorna ela."""
     circuito = ler_arquivo(nome_arquivo)
     maior_no = pegar_maior_no(circuito)
     matriz_inicial, vetor_inicial = criar_matriz_e_vetor_de_elementos_constantes(
-        circuito, maior_no)
+        circuito, maior_no
+    )
 
-    quantidade_pontos = int(duracao / delta) + 1
+    quantidade_pontos = int(duracao / intervalo) + 1
 
-    tempo = numpy.arange(0, quantidade_pontos) * delta
+    tempo = numpy.arange(0, quantidade_pontos) * intervalo
 
     dimensao = maior_no + circuito.quantidade_de_variaveis_de_corrente
     resultados = numpy.zeros((quantidade_pontos, dimensao), dtype=float)
@@ -1050,12 +1186,15 @@ def main(
             vetor_temporal,
             maior_no,
             tempo_atual,
+            intervalo,
             tensoes_iniciais
         )
 
         if len(circuito.diodos) <= 0:
             resultados[index] = numpy.linalg.solve(
-                matriz_temporal[1:, 1:], vetor_temporal[1:])
+                matriz_temporal[1:, 1:],
+                vetor_temporal[1:]
+            )
         else:
             resultados[index] = calcula_circuito_nao_linear(
                 circuito,
@@ -1076,21 +1215,21 @@ if __name__ == "__main__":
     arquivos = ["netlist1.txt", "netlist2.txt", "netlist3.txt", "netlist4.txt"]
 
     with numpy.printoptions(formatter={'float': '{: 0.8f}'.format}):
-        # deltaT = 0.2e-3
-        # nPontos = 2 / deltaT + 1
-        # tempo = numpy.arange(0, nPontos) * deltaT
+        deltaT = 0.2e-3
+        nPontos = 2 / deltaT + 1
+        tempo = numpy.arange(0, nPontos) * deltaT
         # print(main("netlist1.txt", 1e-3, 0.2e-3, 1e-4, [1, 0.5], [1, 2]))
         # resultado = main("netlist1.txt", 2, 0.2e-3, 1e-4, [1, 0.5], [1, 2])
         # print()
-        print(main("netlist2.txt", 1e-3, 0.2e-3, 1e-4, [1, 0], [1, 2]))
+        # print(main("netlist2.txt", 1e-3, 0.2e-3, 1e-4, [1, 0], [1, 2]))
         # resultado = main("netlist2.txt", 2, 0.2e-3, 1e-4, [1, 0], [1, 2])
         # print()
-        # print(main("netlist3.txt", 1e-3, 0.2e-3, 1e-4, [10, 0], [1, 2]))
-        # resultado = main("netlist3.txt", 2, 0.2e-3, 1e-4, [10, 0], [1, 2])
+        print(main("netlist3.txt", 1e-3, 0.2e-3, 1e-4, [10, 0], [1, 2]))
+        resultado = main("netlist3.txt", 2, 0.2e-3, 1e-4, [10, 0], [1, 2])
         # print()
         # print(main("netlist4.txt", 1e-3, 0.2e-3, 1e-4, [10, 0], [1, 2]))
         # resultado = main("netlist4.txt", 2, 0.2e-3, 1e-4, [10, 0], [1, 2])
-        # pyplot.plot(tempo, resultado[0])
-        # pyplot.plot(tempo, resultado[1])
-        # pyplot.show()
-        # pyplot.close()
+        pyplot.plot(tempo, resultado[0])
+        pyplot.plot(tempo, resultado[1])
+        pyplot.show()
+        pyplot.close()

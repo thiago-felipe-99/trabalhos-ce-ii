@@ -1116,6 +1116,11 @@ def adicionar_elementos_temporais(
     return matriz, vetor
 
 
+def existe_elemento_nao_linear(circuito: Circuito) -> bool:
+    """Verifica se existe elemento não linear no circuito"""
+    return len(circuito.diodos) > 0
+
+
 def calcula_circuito_nao_linear(
     circuito: Circuito,
     matriz_temporal: MatrizCondutancia,
@@ -1197,18 +1202,18 @@ def main(
             tensoes_anteriores
         )
 
-        if len(circuito.diodos) <= 0:
-            resultados[index + 1] = numpy.linalg.solve(
-                matriz_temporal[1:, 1:],
-                vetor_temporal[1:]
-            )
-        else:
+        if existe_elemento_nao_linear(circuito):
             resultados[index + 1] = calcula_circuito_nao_linear(
                 circuito,
                 matriz_temporal,
                 vetor_temporal,
                 tensoes_anteriores,
                 tolerancia
+            )
+        else:
+            resultados[index + 1] = numpy.linalg.solve(
+                matriz_temporal[1:, 1:],
+                vetor_temporal[1:]
             )
 
         tensoes_anteriores = resultados[index + 1]

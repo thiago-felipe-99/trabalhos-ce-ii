@@ -930,16 +930,17 @@ def adicionar_indutor(
     """Adiciona um capacitor na matriz de condutancia e no vetor de fontes."""
     no1, no2 = indutor.no1, indutor.no2
     no_indutor = maior_no + indutor.posicao_variavel_de_corrente
-    resistencia = indutor.valor / intervalo
-    tensao = resistencia * (tensoes_anteriores[no_indutor])
+    condutancia = indutor.valor / intervalo
+    tensao = condutancia * (tensoes_anteriores[no_indutor])
 
     fonte = FonteDeTensaoDC(
         indutor.identificacao, no2, no1, tensao, indutor.posicao_variavel_de_corrente
     )
 
     matriz, vetor = adicionar_fonte_de_tensao_dc(
-        matriz, vetor, fonte, maior_no)
-    matriz[no_indutor][no_indutor] += resistencia
+        matriz, vetor, fonte, maior_no
+    )
+    matriz[no_indutor][no_indutor] += condutancia
 
     return matriz, vetor
 
@@ -1178,7 +1179,9 @@ def main(
         constant_values=0
     )
 
-    for index, tempo_atual in enumerate(tempo):
+    resultados[0] = tensoes_anteriores
+
+    for index, tempo_atual in enumerate(tempo[1:]):
         tensoes_anteriores = numpy.concatenate(([0], tensoes_anteriores))
 
         matriz_temporal = numpy.copy(matriz_inicial)
@@ -1195,12 +1198,12 @@ def main(
         )
 
         if len(circuito.diodos) <= 0:
-            resultados[index] = numpy.linalg.solve(
+            resultados[index + 1] = numpy.linalg.solve(
                 matriz_temporal[1:, 1:],
                 vetor_temporal[1:]
             )
         else:
-            resultados[index] = calcula_circuito_nao_linear(
+            resultados[index + 1] = calcula_circuito_nao_linear(
                 circuito,
                 matriz_temporal,
                 vetor_temporal,
@@ -1208,12 +1211,11 @@ def main(
                 tolerancia
             )
 
-        tensoes_anteriores = resultados[index]
+        tensoes_anteriores = resultados[index + 1]
 
     resultados = resultados.transpose()
     nos_desejados = list(map(lambda x: x - 1, nos_desejados))
 
-    print(resultados)
     return resultados[nos_desejados]
 
 
@@ -1238,8 +1240,9 @@ if __name__ == "__main__":
         resultado3 = main("netlist3.txt", 2, 0.2e-3, 1e-4, [10, 0], [1, 2])
         axis[1][0].plot(tempo_total, resultado3[0], tempo_total, resultado3[1])
         print()
-        print(main("netlist4.txt", 1e-3, 0.2e-3, 1e-4, [10, 0], [1, 2]))
-        resultado4 = main("netlist4.txt", 2, 0.2e-3, 1e-4, [10, 0], [1, 2])
-        axis[1][1].plot(tempo_total, resultado3[0], tempo_total, resultado3[1])
+        print(main("netlist4.txt", 1e-3, 0.2e-3, 1e-4, [10, 5], [1, 2]))
+        resultado4 = main("netlist4.txt", 2, 0.2e-3, 1e-4, [10, 5], [1, 2])
+        axis[1][1].plot(tempo_total, resultado4[0], tempo_total, resultado4[1])
+        figures.tight_layout()
         pyplot.show()
         pyplot.close()

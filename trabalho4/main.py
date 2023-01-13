@@ -905,12 +905,12 @@ def adicionar_capacitor(
 ) -> Tuple[MatrizCondutancia, VetorDeFontes]:
     """Adiciona um capacitor na matriz de condutancia e no vetor de fontes."""
     no1, no2 = capacitor.no1, capacitor.no2
-    resistencia = capacitor.valor / intervalo
-    corrente = resistencia * \
+    condutancia = capacitor.valor / intervalo
+    corrente = condutancia * \
         (tensoes_anteriores[no1] - tensoes_anteriores[no2])
 
-    resitor = Resitor(capacitor.identificacao, no1, no2, resistencia)
-    fonte = FonteDeCorrenteDC(capacitor.identificacao, no1, no2, corrente)
+    resitor = Resitor(capacitor.identificacao, no1, no2, 1 / condutancia)
+    fonte = FonteDeCorrenteDC(capacitor.identificacao, no2, no1, corrente)
 
     matriz = adicionar_resitor(matriz, resitor)
     vetor = adicionar_fonte_de_corrente_dc(vetor, fonte)
@@ -1097,7 +1097,7 @@ def adicionar_elementos_temporais(
             matriz,
             vetor,
             indutor,
-            tensoes_atuais,
+            tensoes_anteriores,
             intervalo,
             maior_no
         )
@@ -1107,7 +1107,7 @@ def adicionar_elementos_temporais(
             matriz,
             vetor,
             transformador,
-            tensoes_atuais,
+            tensoes_anteriores,
             intervalo,
             maior_no
         )
